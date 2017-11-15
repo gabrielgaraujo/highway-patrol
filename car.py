@@ -15,8 +15,6 @@ class Car:
 
     def __init__(self, surface):
 
-        surface: pygame.Surface = pygame.display.get_surface()
-
         self.surface_width = surface.get_width()
         self.surface_height = surface.get_height()
 
@@ -58,6 +56,7 @@ class Car:
 
     def reduce_speed(self):
         self.speed -= self.acceleration
+
 
 
 

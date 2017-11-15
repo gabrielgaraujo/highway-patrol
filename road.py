@@ -1,7 +1,9 @@
 from util import absolute_path_for
 import pygame
 
+
 class Road:
+
     def __init__(self, screen):
         texture = pygame.image.load(absolute_path_for('/assets/sprites/asphalt.jpg'))       
         self.screen = screen
@@ -13,7 +15,7 @@ class Road:
         self.screen.blit(self.texture, (0, self.position))
         self.screen.blit(self.texture, (0, self.position + self.height))
 
-    def scroll(self, speed):        
+    def scroll(self, speed):
         if speed > 0:
             self.position += abs(speed)
         elif speed < 0:    

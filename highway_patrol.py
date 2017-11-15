@@ -5,9 +5,10 @@ import pygame
 import sounds
 import math
 
+from obstacle import Obstacle
+
 
 WHITE = (255, 255, 255)
-
 
 class GameStatus(Enum):
     ON_MENU, PLAYING, PAUSED, EXITING = range(4)
@@ -16,6 +17,8 @@ class GameStatus(Enum):
 class HighwayPatrol:
 
     def __init__(self, ascreen):
+
+        self.crashed = False
 
         self.font = pygame.font.SysFont('Monaco', 50, True, False)
         self.status = GameStatus.PLAYING
@@ -26,6 +29,7 @@ class HighwayPatrol:
         self.surface_height = surface.get_height()
 
         self.car = Car(surface)
+        self.obstacle = Obstacle(surface)
 
     def start(self):
         clock = pygame.time.Clock()
@@ -43,26 +47,30 @@ class HighwayPatrol:
             elif pygame.key.get_pressed()[pygame.K_DOWN] != 0:
                 self.car.reduce_speed()
 
-            self.road.scroll(self.car.speed)
 
-            crashed = False
+
+
             if pygame.key.get_pressed()[pygame.K_LEFT] != 0:
                 self.car.turn_left()
                 if self.car.rect.left <= 0:
                     self.car.rect.left = 1
-                    crashed = True
+
             elif pygame.key.get_pressed()[pygame.K_RIGHT] != 0:
                 self.car.turn_right()
                 if self.car.rect.right >= self.surface_width:
                     self.car.rect.right = self.surface_width - 1
-                    crashed = True
 
-            self.car.animate(screen)
+            if not self.crashed:
+                self.road.scroll(self.car.speed)
+                self.car.animate(screen)
+                self.obstacle.animate(screen, self.car.speed)
 
-            self.display_car_speed(self.car.speed)
+                self.display_car_speed(self.car.speed)
 
-            if crashed:
-                sounds.play_crash_sound()
+                collided = self.car.rect.colliderect(self.obstacle.rect)
+                if collided:
+                    self.crashed = True
+                    sounds.play_crash_sound()
 
             pygame.display.update()
             clock.tick(60)
