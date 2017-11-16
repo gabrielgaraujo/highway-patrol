@@ -3,12 +3,10 @@ from road import Road
 from car import Car
 import pygame
 import sounds
-import math
+from hud import HUD
 
 from obstacle import Obstacle
 
-
-WHITE = (255, 255, 255)
 
 class GameStatus(Enum):
     ON_MENU, PLAYING, PAUSED, EXITING = range(4)
@@ -16,20 +14,22 @@ class GameStatus(Enum):
 
 class HighwayPatrol:
 
-    def __init__(self, ascreen):
+    def __init__(self, asurface):
 
         self.crashed = False
 
-        self.font = pygame.font.SysFont('Monaco', 50, True, False)
-        self.status = GameStatus.PLAYING
-        self.road = Road(ascreen)
+        self.hud = HUD(asurface)
 
-        surface: pygame.Surface = pygame.display.get_surface()
+        self.status = GameStatus.PLAYING
+        self.road = Road(asurface)
+
+        self.surface = asurface
         self.surface_width = surface.get_width()
         self.surface_height = surface.get_height()
 
         self.car = Car(surface)
-        self.obstacle = Obstacle(surface)
+        self.obstacles = []
+        self.adding_obstacle = False
 
     def start(self):
         clock = pygame.time.Clock()
@@ -48,13 +48,10 @@ class HighwayPatrol:
                 self.car.reduce_speed()
 
 
-
-
             if pygame.key.get_pressed()[pygame.K_LEFT] != 0:
                 self.car.turn_left()
                 if self.car.rect.left <= 0:
                     self.car.rect.left = 1
-
             elif pygame.key.get_pressed()[pygame.K_RIGHT] != 0:
                 self.car.turn_right()
                 if self.car.rect.right >= self.surface_width:
@@ -62,15 +59,20 @@ class HighwayPatrol:
 
             if not self.crashed:
                 self.road.scroll(self.car.speed)
-                self.car.animate(screen)
-                self.obstacle.animate(screen, self.car.speed)
+                self.car.animate(surface)
 
-                self.display_car_speed(self.car.speed)
+                self.add_random_obstacle(surface)
 
-                collided = self.car.rect.colliderect(self.obstacle.rect)
-                if collided:
-                    self.crashed = True
-                    sounds.play_crash_sound()
+                for obstacle in self.obstacles:
+                    obstacle.animate(surface, self.car.speed)
+                    collided = self.car.rect.colliderect(obstacle.rect)
+
+                    if collided:
+                        self.crashed = True
+                        sounds.play_crash_sound()
+
+                self.hud.display_car_speed(self.car.speed)
+                self.hud.display_car_odometer(self.car.odometer)
 
             pygame.display.update()
             clock.tick(60)
@@ -80,20 +82,34 @@ class HighwayPatrol:
         pygame.quit()
         quit()
 
-    def display_car_speed(self, speed):
+    def add_random_obstacle(self, surface: pygame.Surface):
 
-        speed = math.ceil(speed)
-        text_surface: pygame.Surface = self.font.render("{:.0f} km/h".format(speed),
-                                                        True,
-                                                        WHITE)
+        if self.visible_obstacles == 0 and not self.adding_obstacle:
+            self.adding_obstacle = True
+            self.add_obstacle(surface)
 
-        screen.blit(text_surface,
-                    [20,
-                     (text_surface.get_height() / 2)])
+
+    @property
+    def visible_obstacles(self):
+        count = 0
+        for obstacle in self.obstacles:
+            if self.surface.get_rect().contains(obstacle.rect):
+                count += 1
+        if count > 0:
+            self.adding_obstacle = False
+        return count
+
+    def add_obstacle(self, surface):
+        self.adding_obstacle = True
+        obstacle = Obstacle(surface, self.car.speed)
+        self.obstacles.append(obstacle)
+
+
+
 
 
 pygame.init()
 pygame.display.set_caption('Highway Patrol')
-screen = pygame.display.set_mode((500, 800))
+surface = pygame.display.set_mode((500, 800))
 
-HighwayPatrol(screen).start()
+HighwayPatrol(surface).start()

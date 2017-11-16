@@ -1,10 +1,11 @@
 from util import absolute_path_for
 import pygame
+import time
 
 
 class Car:
     image_path = absolute_path_for('/assets/sprites/cars/animated/police/')
-    acceleration = 1 / 5
+    acceleration = 0.2
     car_image = pygame.image.load(image_path + "idle.png")
 
     car_animation = [
@@ -20,12 +21,17 @@ class Car:
 
         self.is_light_on = False
         self.speed = 0
+        self.max_speed = 200
+
+        self.odometer = 0
+        self.speed_time_delta = time.time()
 
         self.rect = pygame.Rect((self.surface_width / 2.0) - (self.car_image.get_width() / 2.0),
                                 500,
                                 self.car_image.get_width(),
                                 self.car_image.get_height())
         self.repeat = 0
+
 
     def turn_lights_on(self, screen):
         screen.blit(self.car_animation[0], (self.rect.left, self.rect.top))
@@ -45,6 +51,10 @@ class Car:
         else:
             self.turn_lights_on(screen)
 
+        if self.speed > 0:
+            self.update_odometer()
+
+
     def turn_left(self):
         self.rect.left -= abs(self.speed / 1)
 
@@ -52,14 +62,17 @@ class Car:
         self.rect.left += abs(self.speed / 1)
 
     def increase_speed(self):
-        self.speed += self.acceleration
+        if self.speed < self.max_speed:
+            self.speed += self.acceleration
 
     def reduce_speed(self):
         self.speed -= self.acceleration
 
+    def update_odometer(self):
 
+        actual_time = time.time()
+        # in hours
+        delta_time = (time.time() - self.speed_time_delta) / 3600
+        self.speed_time_delta = actual_time
 
-
-
-
-
+        self.odometer += (self.speed * delta_time) * 1000
