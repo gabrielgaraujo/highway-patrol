@@ -1,6 +1,7 @@
 package io.github.gabrielgaraujo.highwaypatrol
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -21,7 +22,9 @@ class MainActivity : Activity() {
             }
         }
         crashSound = CrashSound(this)
-        gameView = GameView(this, Sprites(assets), crashSound)
+        gameView = GameView(this, Sprites(assets), crashSound, Settings(this)) {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
         setContentView(gameView)
     }
 

@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Highway Patrol</string>
+    <string name="settings_title">Settings</string>
+    <string name="controls">Controls</string>
+    <string name="controls_tilt">Tilt</string>
+    <string name="controls_tilt_help">Tip the phone away from you to speed up, towards you to brake, and left or right to steer.</string>
+    <string name="controls_touch">Touch</string>
+    <string name="controls_touch_help">Hold the GAS and BRAKE pedals at the bottom of the screen and drag anywhere else to steer.</string>
+    <string name="no_tilt_sensor">This device has no tilt sensor, so touch controls are used.</string>
+    <string name="tilt_sensitivity">Tilt sensitivity</string>
+    <string name="tilt_sensitivity_value">Tilt sensitivity: %1$d</string>
+    <string name="tilt_calibration_help">The angle you hold the phone at when the game starts or resumes counts as \"no gas, no brake\".</string>
+    <string name="back_to_game">Back to the game</string>
 </resources>

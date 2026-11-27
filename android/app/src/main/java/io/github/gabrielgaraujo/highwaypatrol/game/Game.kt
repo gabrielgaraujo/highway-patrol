@@ -50,6 +50,8 @@ class Game(
         const val BRAKING = 40f
         /** Screen scroll, in world units per second, for each km/h of speed. */
         const val UNITS_PER_KMH = 9f
+        /** Sideways speed, in world units per second, at full tilt. */
+        const val TILT_STEER_SPEED = 600f
         /** Speed at which steering reaches full sensitivity. */
         const val FULL_STEER_SPEED = 40f
         const val SIREN_FRAME_SECONDS = 5f / 60f
@@ -80,8 +82,12 @@ class Game(
         private set
     private var sirenTimer = 0f
 
-    var throttle = false
-    var brake = false
+    /** Gas pedal, 0 (released) to 1 (floored). */
+    var throttle = 0f
+    /** Brake pedal, 0 (released) to 1 (full). */
+    var brake = 0f
+    /** Continuous steering, -1 (full left) to 1 (full right); used by tilt controls. */
+    var steer = 0f
 
     private var distanceToNextSpawn = 0f
     private var crashedFor = 0f
@@ -103,8 +109,9 @@ class Game(
         roadScroll = 0f
         sirenFrame = 0
         sirenTimer = 0f
-        throttle = false
-        brake = false
+        throttle = 0f
+        brake = 0f
+        steer = 0f
         distanceToNextSpawn = 200f
         crashedFor = 0f
     }
@@ -136,9 +143,10 @@ class Game(
             }
         }
 
-        if (brake) speed -= BRAKING * dt
-        else if (throttle) speed += ACCELERATION * dt
+        if (brake > 0f) speed -= BRAKING * brake.coerceAtMost(1f) * dt
+        else if (throttle > 0f) speed += ACCELERATION * throttle.coerceAtMost(1f) * dt
         speed = speed.coerceIn(0f, MAX_SPEED)
+        if (steer != 0f) steerBy(steer.coerceIn(-1f, 1f) * TILT_STEER_SPEED * dt)
 
         val scrolled = speed * UNITS_PER_KMH * dt
         // Wrapped at a multiple of the road tile (WORLD_WIDTH) to keep float precision.
@@ -151,8 +159,9 @@ class Game(
         if (traffic.any { player.intersects(it.box, COLLISION_INSET) }) {
             state = State.CRASHED
             speed = 0f
-            throttle = false
-            brake = false
+            throttle = 0f
+            brake = 0f
+            steer = 0f
             onCrash?.invoke()
         }
     }
