@@ -16,8 +16,9 @@ Arrow keys to drive, click to toggle the siren.
 The Kotlin port lives in [`android/`](android/) and uses the same sprites and
 sound from [`assets/`](assets/).
 
-- **Gas / Brake:** hold the pedals at the bottom of the screen.
-- **Steer:** drag anywhere else (steering gets sharper as you speed up).
+- **Speed:** automatic. Tap to start at 60 km/h; the car speeds up as the
+  run goes on, up to 140 km/h.
+- **Steer:** drag anywhere on the screen.
 - **Siren:** tap the police car.
 - After a crash, tap to drive again. Your best distance is saved.
 

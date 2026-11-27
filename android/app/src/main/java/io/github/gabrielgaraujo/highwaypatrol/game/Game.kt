@@ -24,7 +24,8 @@ class Box(var x: Float, var y: Float, val w: Float, val h: Float) {
 
 class TrafficCar(val sprite: Int, val box: Box, var speed: Float)
 
-enum class State { PLAYING, CRASHED }
+/** READY: waiting for the first tap. PLAYING: driving. CRASHED: run over. */
+enum class State { READY, PLAYING, CRASHED }
 
 /**
  * The whole game simulation, independent of Android so it can be unit tested.
@@ -32,26 +33,26 @@ enum class State { PLAYING, CRASHED }
  * The world is [WORLD_WIDTH] units wide (the original pygame window width) and
  * [worldHeight] units tall, which depends on the phone's aspect ratio.
  * Speeds are in km/h; [update] takes elapsed seconds.
+ *
+ * The car drives itself: a run starts at [START_SPEED] and speeds up steadily
+ * until it reaches [MAX_SPEED]. The player only steers.
  */
 class Game(
     val worldHeight: Float,
     private val playerSize: Size,
     private val trafficSizes: List<Size>,
-    /** Space reserved at the bottom of the screen for the pedals. */
-    private val bottomReserve: Float = 160f,
+    /** Space kept free at the bottom of the screen (system navigation area). */
+    private val bottomReserve: Float = 0f,
     private val random: Random = Random.Default,
 ) {
     companion object {
         const val WORLD_WIDTH = 500f
-        const val MAX_SPEED = 200f
-        /** km/h gained per second with the gas held (0.2 per frame at 60 fps, as in the original). */
-        const val ACCELERATION = 12f
-        /** km/h lost per second with the brake held. */
-        const val BRAKING = 40f
+        const val START_SPEED = 60f
+        const val MAX_SPEED = 140f
+        /** km/h gained per second; reaches [MAX_SPEED] about 90 seconds into a run. */
+        const val ACCELERATION = 0.9f
         /** Screen scroll, in world units per second, for each km/h of speed. */
         const val UNITS_PER_KMH = 9f
-        /** Speed at which steering reaches full sensitivity. */
-        const val FULL_STEER_SPEED = 40f
         const val SIREN_FRAME_SECONDS = 5f / 60f
         const val SIREN_FRAMES = 3
         const val COLLISION_INSET = 6f
@@ -60,7 +61,7 @@ class Game(
         const val TRAFFIC_MAX_SPEED = 100f
     }
 
-    var state = State.PLAYING
+    var state = State.READY
         private set
     val player = Box(0f, 0f, playerSize.w, playerSize.h)
     val traffic = mutableListOf<TrafficCar>()
@@ -80,9 +81,6 @@ class Game(
         private set
     private var sirenTimer = 0f
 
-    var throttle = false
-    var brake = false
-
     private var distanceToNextSpawn = 0f
     private var crashedFor = 0f
 
@@ -93,20 +91,26 @@ class Game(
         reset()
     }
 
+    /** Back to the starting line, waiting for [start]. */
     fun reset() {
-        state = State.PLAYING
+        state = State.READY
         player.x = (WORLD_WIDTH - player.w) / 2f
-        player.y = worldHeight - bottomReserve - player.h - 40f
+        player.y = worldHeight - bottomReserve - player.h - 60f
         traffic.clear()
         speed = 0f
         odometer = 0.0
         roadScroll = 0f
         sirenFrame = 0
         sirenTimer = 0f
-        throttle = false
-        brake = false
         distanceToNextSpawn = 200f
         crashedFor = 0f
+    }
+
+    /** Start driving. Does nothing unless the game is [State.READY]. */
+    fun start() {
+        if (state != State.READY) return
+        state = State.PLAYING
+        speed = START_SPEED
     }
 
     val canRestart get() = state == State.CRASHED && crashedFor >= RESTART_DELAY_SECONDS
@@ -117,9 +121,8 @@ class Game(
 
     /** Move the car sideways by a finger drag of [dx] world units. */
     fun steerBy(dx: Float) {
-        if (state != State.PLAYING || speed <= 0f) return
-        val sensitivity = min(1f, speed / FULL_STEER_SPEED)
-        player.x = (player.x + dx * sensitivity).coerceIn(0f, WORLD_WIDTH - player.w)
+        if (state != State.PLAYING) return
+        player.x = (player.x + dx).coerceIn(0f, WORLD_WIDTH - player.w)
     }
 
     fun update(dt: Float) {
@@ -136,9 +139,9 @@ class Game(
             }
         }
 
-        if (brake) speed -= BRAKING * dt
-        else if (throttle) speed += ACCELERATION * dt
-        speed = speed.coerceIn(0f, MAX_SPEED)
+        if (state == State.READY) return
+
+        speed = min(speed + ACCELERATION * dt, MAX_SPEED)
 
         val scrolled = speed * UNITS_PER_KMH * dt
         // Wrapped at a multiple of the road tile (WORLD_WIDTH) to keep float precision.
@@ -151,8 +154,6 @@ class Game(
         if (traffic.any { player.intersects(it.box, COLLISION_INSET) }) {
             state = State.CRASHED
             speed = 0f
-            throttle = false
-            brake = false
             onCrash?.invoke()
         }
     }

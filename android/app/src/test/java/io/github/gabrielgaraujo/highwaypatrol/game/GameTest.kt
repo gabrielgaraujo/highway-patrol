@@ -12,58 +12,59 @@ class GameTest {
     private fun newGame(seed: Int = 1) =
         Game(worldHeight = 1000f, playerSize = car, trafficSizes = listOf(car), random = Random(seed))
 
-    private fun Game.run(seconds: Float, step: Float = 1f / 60f) {
+    /** Advance the game while clearing traffic, so a crash can't end the run. */
+    private fun Game.driveSafely(seconds: Float, step: Float = 1f / 60f) {
         var t = 0f
         while (t < seconds) {
-            update(step); t += step
+            traffic.clear()
+            update(step)
+            t += step
         }
     }
 
     @Test
-    fun gasAcceleratesUpToMaxSpeed() {
+    fun waitsForStartBeforeMoving() {
         val game = newGame()
-        game.throttle = true
-        game.update(1f)
-        assertEquals(Game.ACCELERATION, game.speed, 0.01f)
-        repeat(30) {
-            game.traffic.clear() // keep traffic from ending the run
-            game.update(1f)
-        }
-        assertEquals(Game.MAX_SPEED, game.speed, 0f)
-    }
-
-    @Test
-    fun brakingNeverGoesBelowZero() {
-        val game = newGame()
-        game.throttle = true
-        game.update(1f)
-        game.throttle = false
-        game.brake = true
         game.update(5f)
+        assertEquals(State.READY, game.state)
         assertEquals(0f, game.speed, 0f)
+        assertEquals(0.0, game.odometer, 0.0)
+        assertTrue(game.traffic.isEmpty())
+
+        game.start()
+        assertEquals(State.PLAYING, game.state)
+        assertEquals(Game.START_SPEED, game.speed, 0f)
+    }
+
+    @Test
+    fun speedsUpOnItsOwnAndCapsAtMax() {
+        val game = newGame()
+        game.start()
+        game.driveSafely(10f)
+        assertEquals(Game.START_SPEED + Game.ACCELERATION * 10f, game.speed, 0.1f)
+
+        game.driveSafely(120f)
+        assertEquals(Game.MAX_SPEED, game.speed, 0f)
+        assertEquals(140f, Game.MAX_SPEED, 0f)
     }
 
     @Test
     fun odometerCountsMeters() {
         val game = newGame()
-        game.throttle = true
-        game.update(1f) // 12 km/h
-        game.throttle = false
+        game.start()
         val before = game.odometer
-        game.update(3.6f) // 12 km/h for 3.6 s = 12 m
-        assertEquals(12.0, game.odometer - before, 0.01)
+        game.driveSafely(1f, step = 1f) // about 60.5 km/h for 1 s
+        assertEquals(game.speed / 3.6, game.odometer - before, 0.01)
     }
 
     @Test
-    fun cannotSteerWhenStoppedAndStaysOnScreen() {
+    fun steeringOnlyWhileDrivingAndStaysOnScreen() {
         val game = newGame()
         val start = game.player.x
         game.steerBy(100f)
         assertEquals(start, game.player.x, 0f)
 
-        game.throttle = true
-        game.update(5f) // 60 km/h, full sensitivity
-        game.traffic.clear()
+        game.start()
         game.steerBy(-10_000f)
         assertEquals(0f, game.player.x, 0f)
         game.steerBy(10_000f)
@@ -71,15 +72,13 @@ class GameTest {
     }
 
     @Test
-    fun hittingTrafficCrashesAndRestartResets() {
+    fun hittingTrafficCrashesAndRestartWaitsForStart() {
         val game = newGame()
         var crashes = 0
         game.onCrash = { crashes++ }
-        game.throttle = true
-        game.update(1f)
-        game.traffic.clear()
+        game.start()
         game.traffic.add(TrafficCar(0, Box(game.player.x, game.player.y - 230f, car.w, car.h), 0f))
-        game.run(1f)
+        repeat(60) { if (game.state == State.PLAYING) game.update(1f / 60f) }
 
         assertEquals(State.CRASHED, game.state)
         assertEquals(1, crashes)
@@ -88,7 +87,7 @@ class GameTest {
         assertTrue(game.canRestart)
 
         game.reset()
-        assertEquals(State.PLAYING, game.state)
+        assertEquals(State.READY, game.state)
         assertEquals(0f, game.speed, 0f)
         assertTrue(game.traffic.isEmpty())
     }
@@ -96,8 +95,7 @@ class GameTest {
     @Test
     fun trafficSpawnsWhileDrivingAndIsCleanedUp() {
         val game = newGame()
-        game.throttle = true
-        game.update(10f) // jump to 120 km/h
+        game.start()
         var maxCars = 0
         repeat(600) {
             // Keep the player out of the way so we only observe traffic.
