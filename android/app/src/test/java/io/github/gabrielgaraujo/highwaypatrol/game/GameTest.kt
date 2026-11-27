@@ -22,7 +22,7 @@ class GameTest {
     @Test
     fun gasAcceleratesUpToMaxSpeed() {
         val game = newGame()
-        game.throttle = 1f
+        game.throttle = true
         game.update(1f)
         assertEquals(Game.ACCELERATION, game.speed, 0.01f)
         repeat(30) {
@@ -35,10 +35,10 @@ class GameTest {
     @Test
     fun brakingNeverGoesBelowZero() {
         val game = newGame()
-        game.throttle = 1f
+        game.throttle = true
         game.update(1f)
-        game.throttle = 0f
-        game.brake = 1f
+        game.throttle = false
+        game.brake = true
         game.update(5f)
         assertEquals(0f, game.speed, 0f)
     }
@@ -46,9 +46,9 @@ class GameTest {
     @Test
     fun odometerCountsMeters() {
         val game = newGame()
-        game.throttle = 1f
+        game.throttle = true
         game.update(1f) // 12 km/h
-        game.throttle = 0f
+        game.throttle = false
         val before = game.odometer
         game.update(3.6f) // 12 km/h for 3.6 s = 12 m
         assertEquals(12.0, game.odometer - before, 0.01)
@@ -61,7 +61,7 @@ class GameTest {
         game.steerBy(100f)
         assertEquals(start, game.player.x, 0f)
 
-        game.throttle = 1f
+        game.throttle = true
         game.update(5f) // 60 km/h, full sensitivity
         game.traffic.clear()
         game.steerBy(-10_000f)
@@ -75,7 +75,7 @@ class GameTest {
         val game = newGame()
         var crashes = 0
         game.onCrash = { crashes++ }
-        game.throttle = 1f
+        game.throttle = true
         game.update(1f)
         game.traffic.clear()
         game.traffic.add(TrafficCar(0, Box(game.player.x, game.player.y - 230f, car.w, car.h), 0f))
@@ -96,7 +96,7 @@ class GameTest {
     @Test
     fun trafficSpawnsWhileDrivingAndIsCleanedUp() {
         val game = newGame()
-        game.throttle = 1f
+        game.throttle = true
         game.update(10f) // jump to 120 km/h
         var maxCars = 0
         repeat(600) {
@@ -108,23 +108,6 @@ class GameTest {
         assertEquals(State.PLAYING, game.state)
         assertTrue("traffic should spawn", maxCars > 0)
         assertTrue("old traffic should be removed", maxCars < 20)
-    }
-
-    @Test
-    fun partialInputsScaleAccelerationAndSteering() {
-        val game = newGame()
-        game.throttle = 0.5f
-        game.update(1f)
-        assertEquals(Game.ACCELERATION / 2f, game.speed, 0.01f)
-
-        game.throttle = 1f
-        game.update(4f) // 54 km/h: full steering sensitivity
-        game.traffic.clear()
-        val x = game.player.x
-        game.throttle = 0f
-        game.steer = 0.25f
-        game.update(0.1f)
-        assertEquals(x + Game.TILT_STEER_SPEED * 0.25f * 0.1f, game.player.x, 0.01f)
     }
 
     @Test

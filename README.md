@@ -16,20 +16,10 @@ Arrow keys to drive, click to toggle the siren.
 The Kotlin port lives in [`android/`](android/) and uses the same sprites and
 sound from [`assets/`](assets/).
 
-**Tilt controls (default)**
-
-- **Gas:** tip the top of the phone away from you. **Brake:** tip it towards you.
-  The angle you're holding the phone at when a run starts counts as neutral.
-- **Steer:** tilt left or right.
-
-**Touch controls** (switch in settings with the ⚙ button)
-
 - **Gas / Brake:** hold the pedals at the bottom of the screen.
 - **Steer:** drag anywhere else (steering gets sharper as you speed up).
-
-Either way, tap the police car for the siren. After a crash, tap to drive
-again. Your best distance is saved. Settings also has a tilt sensitivity
-slider. Phones without a tilt sensor use touch controls.
+- **Siren:** tap the police car.
+- After a crash, tap to drive again. Your best distance is saved.
 
 ### Getting the APK
 
