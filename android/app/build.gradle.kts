@@ -26,6 +26,17 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // The release key is private: CI decodes it from the SIGNING_KEYSTORE_BASE64
+        // secret and passes its path and password in these environment variables.
+        val releaseKeystore = System.getenv("SIGNING_KEYSTORE")?.let(::file)?.takeIf { it.exists() }
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("SIGNING_PASSWORD")
+                keyAlias = "highwaypatrol"
+                keyPassword = System.getenv("SIGNING_PASSWORD")
+            }
+        }
     }
 
     sourceSets["main"].assets.srcDirs(
@@ -37,6 +48,8 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Without the key (local builds, forks) this produces an unsigned APK.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

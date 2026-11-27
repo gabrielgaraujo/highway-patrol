@@ -33,14 +33,21 @@ slider. Phones without a tilt sensor use touch controls.
 
 ### Getting the APK
 
-Every push that touches `android/` or `assets/` runs the **Android** GitHub
-Actions workflow, which runs the unit tests and builds a debug APK. Download
-it from the workflow run's **Artifacts** section
-(`highway-patrol-debug-apk`), unzip it, and install `app-debug.apk` on your
-phone (you'll need to allow installing apps from unknown sources).
-Every build is signed with the same debug key (`android/app/debug.keystore`),
-so a newer APK installs straight over the old one and keeps your settings and
-best distance. That key is for testing only, not for a Play Store release.
+Every push to `master` publishes a signed release APK as a GitHub Release.
+The latest one is always at:
+
+**https://github.com/gabrielgaraujo/highway-patrol/releases/latest/download/highway-patrol.apk**
+
+Open it on your phone to install, or to update over an earlier release.
+(You'll need to allow installing apps from your browser or Files app.)
+To publish a release from another branch, run the **Android** workflow by hand
+from the Actions tab.
+
+Releases are signed with a private key kept in two repository secrets,
+`SIGNING_KEYSTORE_BASE64` (the base64 keystore) and `SIGNING_PASSWORD`.
+Keep a backup of the keystore: if it's lost, new releases can't update an
+installed copy. Pull requests and other pushes also build the release APK and
+attach it to the workflow run as an artifact.
 
 ### Building locally
 
@@ -48,6 +55,6 @@ Open `android/` in Android Studio, or with the Android SDK installed:
 
 ```sh
 cd android
-./gradlew testDebugUnitTest assembleDebug
+./gradlew testDebugUnitTest assembleDebug  # debug build, signed with android/app/debug.keystore
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```

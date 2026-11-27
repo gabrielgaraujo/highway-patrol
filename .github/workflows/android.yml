@@ -5,7 +5,11 @@ on:
     paths: ["android/**", "assets/**", ".github/workflows/android.yml"]
   pull_request:
     paths: ["android/**", "assets/**", ".github/workflows/android.yml"]
+  # Run by hand from the Actions tab to publish a release from any branch.
   workflow_dispatch:
+
+permissions:
+  contents: write # to publish GitHub Releases
 
 jobs:
   build:
@@ -13,6 +17,8 @@ jobs:
     defaults:
       run:
         working-directory: android
+    env:
+      VERSION: 1.0.${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,13 +31,44 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest
+        run: ./gradlew testReleaseUnitTest
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Set up release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::SIGNING_KEYSTORE_BASE64 secret is not set, so the APK will be unsigned and cannot be installed."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "SIGNING_KEYSTORE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release*.apk "$RUNNER_TEMP/highway-patrol.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: highway-patrol-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: highway-patrol-${{ env.VERSION }}
+          path: ${{ runner.temp }}/highway-patrol.apk
           if-no-files-found: error
+
+      # Pushes to master (and manual runs) become a GitHub Release with a direct
+      # download link: /releases/latest/download/highway-patrol.apk
+      - name: Publish GitHub Release
+        if: >-
+          env.SIGNING_KEYSTORE != '' &&
+          (github.event_name == 'workflow_dispatch' ||
+           (github.event_name == 'push' && github.ref == 'refs/heads/master'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" "$RUNNER_TEMP/highway-patrol.apk" \
+            --target "$GITHUB_SHA" \
+            --title "Highway Patrol $VERSION" \
+            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Download highway-patrol.apk below and open it on your phone to install or update." \
+            --latest
