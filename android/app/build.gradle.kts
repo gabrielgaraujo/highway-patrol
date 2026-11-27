@@ -11,8 +11,21 @@ android {
         applicationId = "io.github.gabrielgaraujo.highwaypatrol"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // CI numbers each build so a new APK always installs as an update.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "1.0.$build"
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            // Fixed debug key so every CI build can install over the previous one.
+            // Debug/testing only: never use this key for a Play Store release.
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     sourceSets["main"].assets.srcDirs(

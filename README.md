@@ -38,6 +38,9 @@ Actions workflow, which runs the unit tests and builds a debug APK. Download
 it from the workflow run's **Artifacts** section
 (`highway-patrol-debug-apk`), unzip it, and install `app-debug.apk` on your
 phone (you'll need to allow installing apps from unknown sources).
+Every build is signed with the same debug key (`android/app/debug.keystore`),
+so a newer APK installs straight over the old one and keeps your settings and
+best distance. That key is for testing only, not for a Play Store release.
 
 ### Building locally
 
