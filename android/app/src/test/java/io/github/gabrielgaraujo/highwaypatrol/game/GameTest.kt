@@ -30,6 +30,7 @@ class GameTest {
         assertEquals(0f, game.speed, 0f)
         assertEquals(0.0, game.odometer, 0.0)
         assertTrue(game.traffic.isEmpty())
+        assertTrue("road rolls behind the title screen", game.roadScroll > 0f)
 
         game.start()
         assertEquals(State.PLAYING, game.state)

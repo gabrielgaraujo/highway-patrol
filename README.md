@@ -16,11 +16,12 @@ Arrow keys to drive, click to toggle the siren.
 The Kotlin port lives in [`android/`](android/) and uses the same sprites and
 sound from [`assets/`](assets/).
 
-- **Speed:** automatic. Tap to start at 60 km/h; the car speeds up as the
-  run goes on, up to 140 km/h.
+- **Speed:** automatic. Tap the title screen to start at 60 km/h; the car
+  speeds up as the run goes on, up to 140 km/h.
 - **Steer:** drag anywhere on the screen.
 - **Siren:** tap the police car.
 - After a crash, tap to drive again. Your best distance is saved.
+- **Music:** the ♪ button on the title and crash screens turns it on or off.
 
 ### Getting the APK
 
@@ -39,6 +40,12 @@ Releases are signed with a private key kept in two repository secrets,
 Keep a backup of the keystore: if it's lost, new releases can't update an
 installed copy. Pull requests and other pushes also build the release APK and
 attach it to the workflow run as an artifact.
+
+### Music
+
+`assets/sounds/music.ogg` is an original chiptune loop rendered by
+[`tools/make_music.py`](tools/make_music.py) (needs numpy and ffmpeg). Edit the
+chords, melody or tempo there and run `python3 tools/make_music.py` to re-render.
 
 ### Building locally
 

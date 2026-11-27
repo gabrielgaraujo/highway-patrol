@@ -11,6 +11,7 @@ import android.view.WindowManager
 class MainActivity : Activity() {
     private lateinit var gameView: GameView
     private lateinit var crashSound: CrashSound
+    private lateinit var music: Music
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,7 +22,8 @@ class MainActivity : Activity() {
             }
         }
         crashSound = CrashSound(this)
-        gameView = GameView(this, Sprites(assets), crashSound)
+        music = Music(this)
+        gameView = GameView(this, Sprites(assets), crashSound, music)
         setContentView(gameView)
     }
 
@@ -52,15 +54,18 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         gameView.resume()
+        music.resume()
     }
 
     override fun onPause() {
         gameView.pause()
+        music.pause()
         super.onPause()
     }
 
     override fun onDestroy() {
         crashSound.release()
+        music.release()
         super.onDestroy()
     }
 }

@@ -24,7 +24,7 @@ class Box(var x: Float, var y: Float, val w: Float, val h: Float) {
 
 class TrafficCar(val sprite: Int, val box: Box, var speed: Float)
 
-/** READY: waiting for the first tap. PLAYING: driving. CRASHED: run over. */
+/** READY: title screen, waiting for the first tap. PLAYING: driving. CRASHED: run over. */
 enum class State { READY, PLAYING, CRASHED }
 
 /**
@@ -51,6 +51,8 @@ class Game(
         const val MAX_SPEED = 140f
         /** km/h gained per second; reaches [MAX_SPEED] about 90 seconds into a run. */
         const val ACCELERATION = 0.9f
+        /** How fast the road rolls behind the title screen. */
+        const val TITLE_SCROLL_SPEED = 30f
         /** Screen scroll, in world units per second, for each km/h of speed. */
         const val UNITS_PER_KMH = 9f
         const val SIREN_FRAME_SECONDS = 5f / 60f
@@ -139,7 +141,10 @@ class Game(
             }
         }
 
-        if (state == State.READY) return
+        if (state == State.READY) {
+            roadScroll = (roadScroll + TITLE_SCROLL_SPEED * UNITS_PER_KMH * dt) % (WORLD_WIDTH * 100f)
+            return
+        }
 
         speed = min(speed + ACCELERATION * dt, MAX_SPEED)
 

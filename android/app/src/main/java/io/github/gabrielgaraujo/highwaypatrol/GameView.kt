@@ -22,12 +22,17 @@ import kotlin.math.ceil
  * Everything is drawn in world units (500 wide, like the original window) and
  * scaled to the screen width, so the game looks the same on every phone.
  *
- * The car speeds up on its own. Tap to start, drag anywhere to steer, tap
- * the police car to toggle the siren, and tap after a crash to drive again.
+ * The game opens on a title screen. The car speeds up on its own: drag
+ * anywhere to steer, tap the police car to toggle the siren, and tap after a
+ * crash to drive again. The ♪ button (title and crash screens) toggles music.
  */
 @SuppressLint("ViewConstructor")
-class GameView(context: Context, private val sprites: Sprites, private val crashSound: CrashSound) :
-    View(context), Choreographer.FrameCallback {
+class GameView(
+    context: Context,
+    private val sprites: Sprites,
+    private val crashSound: CrashSound,
+    private val music: Music,
+) : View(context), Choreographer.FrameCallback {
 
     private var game: Game? = null
     private var scale = 1f
@@ -39,6 +44,8 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
 
     private var running = false
     private var lastFrameNanos = 0L
+    /** Seconds since launch; drives the title screen's blinking and pulsing. */
+    private var clock = 0f
 
     private var steeringPointer = MotionEvent.INVALID_POINTER_ID
     private var steeringLastX = 0f
@@ -64,8 +71,24 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
         setShadowLayer(4f, 2f, 2f, Color.BLACK)
     }
     private val hintPaint = Paint(bodyPaint).apply { textSize = 26f }
+    private val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD_ITALIC)
+    }
+    private val lightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 0, 0, 0) }
+    private val buttonIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 40f
+        textAlign = Paint.Align.CENTER
+        strokeWidth = 5f
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val titleShade = Paint().apply { color = Color.argb(110, 0, 0, 0) }
 
     private val dst = RectF()
+    private val musicButton = RectF()
 
     init {
         setOnApplyWindowInsetsListener { _, insets ->
@@ -105,6 +128,7 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
 
     private fun onCrash() {
         crashSound.play()
+        music.duck(true)
         val meters = game?.odometer?.toLong() ?: 0L
         if (meters > bestMeters) {
             bestMeters = meters
@@ -132,6 +156,7 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
             val dt = ((frameTimeNanos - lastFrameNanos) / 1e9f).coerceAtMost(1f / 20f)
             game?.update(dt)
         }
+        if (lastFrameNanos != 0L) clock += ((frameTimeNanos - lastFrameNanos) / 1e9f).coerceAtMost(1f / 20f)
         lastFrameNanos = frameTimeNanos
         invalidate()
         Choreographer.getInstance().postFrameCallback(this)
@@ -149,9 +174,12 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
         val police = if (game.sirenOn) sprites.policeSiren[game.sirenFrame] else sprites.policeIdle
         drawBitmap(canvas, police, game.player.x, game.player.y)
 
-        drawHud(canvas, game)
-        if (game.state == State.READY) drawStartHint(canvas, game)
-        if (game.state == State.CRASHED) drawCrashed(canvas, game)
+        when (game.state) {
+            State.READY -> drawTitle(canvas, game)
+            State.PLAYING -> drawHud(canvas, game)
+            State.CRASHED -> drawCrashed(canvas, game)
+        }
+        if (game.state != State.PLAYING) drawMusicButton(canvas)
 
         canvas.restore()
     }
@@ -180,11 +208,64 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
         canvas.drawText("${ceil(game.odometer).toLong()} m", Game.WORLD_WIDTH - 20f, baseline, hudPaint)
     }
 
-    private fun drawStartHint(canvas: Canvas, game: Game) {
+    private fun drawTitle(canvas: Canvas, game: Game) {
+        canvas.drawRect(0f, 0f, Game.WORLD_WIDTH, game.worldHeight, titleShade)
         val cx = Game.WORLD_WIDTH / 2f
-        val y = game.player.y - 90f
-        canvas.drawText("Tap to start", cx, y, bodyPaint)
-        canvas.drawText("Drag to steer · tap the car for the siren", cx, y + 40f, hintPaint)
+        val top = topInset + game.worldHeight * 0.14f
+        // The red and blue halves of the light bar take turns, like the car's siren.
+        val redOn = (clock * 3f).toInt() % 2 == 0
+
+        drawLogoLine(canvas, "HIGHWAY", cx, top + 90f, if (redOn) RED else BLUE)
+        drawLogoLine(canvas, "PATROL", cx, top + 185f, if (redOn) BLUE else RED)
+
+        val barY = top + 215f
+        drawLight(canvas, cx - 125f, barY, cx - 5f, RED, redOn)
+        drawLight(canvas, cx + 5f, barY, cx + 125f, BLUE, !redOn)
+
+        // "Tap to play" breathes in and out.
+        val pulse = 0.55f + 0.45f * ((kotlin.math.sin(clock * 4f) + 1f) / 2f)
+        bodyPaint.alpha = (255 * pulse).toInt()
+        canvas.drawText("Tap to play", cx, top + 320f, bodyPaint)
+        bodyPaint.alpha = 255
+        if (bestMeters > 0) canvas.drawText("Best: $bestMeters m", cx, top + 370f, hintPaint)
+        canvas.drawText("Drag to steer · tap the car for the siren", cx, game.player.y - 30f, hintPaint)
+    }
+
+    private fun drawLogoLine(canvas: Canvas, text: String, cx: Float, baseline: Float, glow: Int) {
+        // Largest size that fits the screen with a margin.
+        logoPaint.textSize = 100f
+        val width = logoPaint.measureText(text)
+        if (width > LOGO_MAX_WIDTH) logoPaint.textSize = 100f * LOGO_MAX_WIDTH / width
+        logoPaint.setShadowLayer(18f, 0f, 0f, glow)
+        canvas.drawText(text, cx, baseline, logoPaint)
+    }
+
+    private fun drawLight(canvas: Canvas, left: Float, y: Float, right: Float, color: Int, on: Boolean) {
+        lightPaint.color = color
+        lightPaint.alpha = if (on) 255 else 70
+        if (on) lightPaint.setShadowLayer(16f, 0f, 0f, color) else lightPaint.clearShadowLayer()
+        dst.set(left, y, right, y + 16f)
+        canvas.drawRoundRect(dst, 8f, 8f, lightPaint)
+    }
+
+    private fun layoutMusicButton() {
+        val cx = Game.WORLD_WIDTH - 20f - BUTTON_RADIUS
+        val cy = topInset + 20f + BUTTON_RADIUS
+        musicButton.set(cx - BUTTON_RADIUS, cy - BUTTON_RADIUS, cx + BUTTON_RADIUS, cy + BUTTON_RADIUS)
+    }
+
+    private fun drawMusicButton(canvas: Canvas) {
+        layoutMusicButton()
+        canvas.drawOval(musicButton, buttonPaint)
+        val cx = musicButton.centerX()
+        val cy = musicButton.centerY()
+        val textY = cy - (buttonIconPaint.ascent() + buttonIconPaint.descent()) / 2f
+        buttonIconPaint.alpha = if (music.enabled) 255 else 140
+        canvas.drawText(NOTE, cx, textY, buttonIconPaint)
+        if (!music.enabled) {
+            val d = BUTTON_RADIUS * 0.6f
+            canvas.drawLine(cx - d, cy - d, cx + d, cy + d, buttonIconPaint)
+        }
     }
 
     private fun drawCrashed(canvas: Canvas, game: Game) {
@@ -203,13 +284,22 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                if (game.state == State.CRASHED) {
-                    if (!game.canRestart) return true
-                    game.reset()
-                }
                 val i = event.actionIndex
                 val x = event.getX(i) / scale
                 val y = event.getY(i) / scale
+                if (game.state != State.PLAYING) {
+                    layoutMusicButton()
+                    // Generous hit area: the button is small and sits in a corner.
+                    if (x >= musicButton.left - 16f && y <= musicButton.bottom + 16f) {
+                        music.enabled = !music.enabled
+                        return true
+                    }
+                }
+                if (game.state == State.CRASHED) {
+                    if (!game.canRestart) return true
+                    game.reset()
+                    music.duck(false)
+                }
                 if (game.state == State.READY) {
                     game.start() // the tap that starts a run can also begin steering
                 } else if (game.player.contains(x, y, slack = 20f)) {
@@ -240,5 +330,11 @@ class GameView(context: Context, private val sprites: Sprites, private val crash
     companion object {
         private const val KEY_BEST = "best_meters"
         private const val STEER_GAIN = 1.5f
+        private const val BUTTON_RADIUS = 30f
+        private const val LOGO_MAX_WIDTH = 440f
+        private val RED = Color.rgb(255, 50, 50)
+        private val BLUE = Color.rgb(60, 120, 255)
+        /** Music note, forced to text (not emoji) style. */
+        private const val NOTE = "\u266A\uFE0E"
     }
 }
